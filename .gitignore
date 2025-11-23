@@ -1,0 +1,7 @@
+cnppo/experiments/runs
+cnppo/experiments/tblogs
+cnppo/experiments/wandb
+*/__pycache__
+tblogs
+*.egg-info
+.vscode

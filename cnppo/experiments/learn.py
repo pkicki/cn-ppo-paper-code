@@ -4,9 +4,17 @@ import argparse
 
 import gym.wrappers
 import numpy as np
+import shimmy
 import stable_baselines3.common.utils
+import wandb
 from cnppo.cnpolicy import ColoredNoiseActorCriticPolicy
 from stable_baselines3.common.env_util import make_vec_env
+from dm_control import suite
+from gymnasium.wrappers import FlattenObservation
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from wandb.integration.sb3 import WandbCallback
+
+from cnppo.dm_control_wrapper import DMControlGymWrapper
 
 # -----
 """
@@ -19,12 +27,20 @@ VERSION 1.3: changed backward version support.
 VERSION = 1.3
 SUPPORTED_VERSIONS = {1.1, 1.2, VERSION}
 
+def make_dm_control_env(domain, task, seed):
+    def _fn():
+        return DMControlGymWrapper(domain, task, seed=seed)
+    return _fn
+
+
 
 def run_experiment(
     env_id="Pendulum-v1",
     seed=1234,
-    n_envs=50,
-    n_eval_envs=10,
+    #n_envs=50,
+    #n_eval_envs=10,
+    n_envs=8,
+    n_eval_envs=8,
     clip_range=0.2,
     lr=1e-4,
     ent_coef=0.0,
@@ -44,8 +60,31 @@ def run_experiment(
     stable_baselines3.common.utils.set_random_seed(seed)
     # Create the environment
     # FlattenObservation wrapper is necessary because dm-control environments (with dm2gym) return dict-based space.
-    env = make_vec_env(env_id, n_envs=n_envs, seed=seed, wrapper_class=gym.wrappers.FlattenObservation)
-    eval_env = make_vec_env(env_id, n_envs=n_eval_envs, seed=seed, wrapper_class=gym.wrappers.FlattenObservation)
+    if env_id.split("-")[0] in suite._DOMAINS:
+        env = DummyVecEnv([make_dm_control_env(env_id.split("-")[0], env_id.split("-")[1], i) for i in range(n_envs)])
+        eval_env = DummyVecEnv([make_dm_control_env(env_id.split("-")[0], env_id.split("-")[1], i) for i in range(n_eval_envs)])
+        #env = SubprocVecEnv([make_dm_control_env(env_id.split("-")[0], env_id.split("-")[1], i) for i in range(n_envs)])
+        #eval_env = SubprocVecEnv([make_dm_control_env(env_id.split("-")[0], env_id.split("-")[1], i) for i in range(n_eval_envs)])
+        #env = DMControlGymWrapper(env_id.split("-")[0], env_id.split("-")[1], seed=seed)
+        #eval_env = DMControlGymWrapper(env_id.split("-")[0], env_id.split("-")[1], seed=seed)
+    else:
+        #env = make_vec_env(env_id, n_envs=n_envs, seed=seed, wrapper_class=gym.wrappers.FlattenObservation)
+        #eval_env = make_vec_env(env_id, n_envs=n_eval_envs, seed=seed, wrapper_class=gym.wrappers.FlattenObservation)
+        env = make_vec_env(env_id, n_envs=n_envs, seed=seed)
+        eval_env = make_vec_env(env_id, n_envs=n_eval_envs, seed=seed)
+
+    config = {**locals()}
+
+    # 2. Initialize W&B run
+    run = wandb.init(
+        project=f"sb3_{env_id}",  # Name of your W&B project
+        group=f"nc{noise_color}_nenvs{n_envs}_lr{lr}_ent{ent_coef}_cr{clip_range}",  # Group is optional
+        config=config,             # Pass the configuration dictionary
+        sync_tensorboard=True,     # REQUIRED: Auto-upload SB3's TensorBoard metrics
+        #monitor_gym=True,          # Optional: Auto-upload videos (requires a wrapper)
+        save_code=True,            # Optional: Save the main script file
+    )
+    tensorboard_log_path = f"runs/{run.id}"
 
     policy_kwargs = {}
     if cn_policy:
@@ -65,14 +104,16 @@ def run_experiment(
         ent_coef=ent_coef,
         learning_rate=lr,
         clip_range=clip_range,
-        tensorboard_log=f"tblogs/nc{noise_color}",
+        tensorboard_log=tensorboard_log_path,
+        #tensorboard_log=f"tblogs/nc{noise_color}",
         verbose=1,
         use_sde=use_sde,  # --- V1.1
     )
     eval_cb = stable_baselines3.common.callbacks.EvalCallback(
         eval_env=eval_env, n_eval_episodes=eval_episodes, eval_freq=max(eval_freq // n_envs, 1)
     )
-    agent.learn(total_timesteps=int(total_timesteps), progress_bar=True, callback=[eval_cb])
+    wandb_callback = WandbCallback(verbose=0)
+    agent.learn(total_timesteps=int(total_timesteps), progress_bar=True, callback=[eval_cb, wandb_callback])
 
 
 if __name__ == "__main__":
