@@ -2,15 +2,12 @@
 """Policies: abstract base class and concrete implementations."""
 import argparse
 
-import gym.wrappers
 import numpy as np
-import shimmy
 import stable_baselines3.common.utils
 import wandb
 from cnppo.cnpolicy import ColoredNoiseActorCriticPolicy
 from stable_baselines3.common.env_util import make_vec_env
 from dm_control import suite
-from gymnasium.wrappers import FlattenObservation
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from wandb.integration.sb3 import WandbCallback
 
