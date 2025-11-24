@@ -10,8 +10,14 @@ from stable_baselines3.common.env_util import make_vec_env
 from dm_control import suite
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from wandb.integration.sb3 import WandbCallback
+from stable_baselines3.common.monitor import Monitor
+from gymnasium.wrappers import FlattenObservation
 
 from cnppo.dm_control_wrapper import DMControlGymWrapper
+import gymnasium as gym
+import gymnasium_robotics
+
+gym.register_envs(gymnasium_robotics)
 
 # -----
 """
@@ -28,8 +34,14 @@ def make_dm_control_env(domain, task, seed):
     def _fn():
         return DMControlGymWrapper(domain, task, seed=seed)
     return _fn
-
-
+def make_gym_env(env_id):
+    def _fn():
+        env = gym.make(env_id)
+        env = Monitor(env)
+        if hasattr(env.unwrapped.observation_space, "keys"):
+            env = FlattenObservation(env)
+        return env
+    return _fn
 
 def run_experiment(
     env_id="Pendulum-v1",
@@ -67,8 +79,11 @@ def run_experiment(
     else:
         #env = make_vec_env(env_id, n_envs=n_envs, seed=seed, wrapper_class=gym.wrappers.FlattenObservation)
         #eval_env = make_vec_env(env_id, n_envs=n_eval_envs, seed=seed, wrapper_class=gym.wrappers.FlattenObservation)
-        env = make_vec_env(env_id, n_envs=n_envs, seed=seed)
-        eval_env = make_vec_env(env_id, n_envs=n_eval_envs, seed=seed)
+        #env = make_vec_env(env_id, n_envs=n_envs, seed=seed)
+        #eval_env = make_vec_env(env_id, n_envs=n_eval_envs, seed=seed)
+        env = DummyVecEnv([make_gym_env(env_id) for i in range(n_envs)])
+        eval_env = DummyVecEnv([make_gym_env(env_id) for i in range(n_eval_envs)])
+
 
     config = {**locals()}
 
