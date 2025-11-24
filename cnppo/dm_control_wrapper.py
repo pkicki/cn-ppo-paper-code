@@ -17,7 +17,7 @@ class DMControlGymWrapper(gym.Env):
 
         # Observation: flatten dm_control dict
         obs_spec = self._env.observation_spec()
-        obs_size = sum(np.prod(v.shape) for v in obs_spec.values())
+        obs_size = sum(int(np.prod(v.shape)) for v in obs_spec.values())
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(obs_size,), dtype=np.float32
         )
