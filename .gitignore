@@ -5,3 +5,5 @@ cnppo/experiments/wandb
 tblogs
 *.egg-info
 .vscode
+runs
+wandb
