@@ -111,7 +111,12 @@ def run_experiment(
         policy = LowPassNoiseActorCriticPolicy
         policy_kwargs["noise_cutoff_freq"] = noise_cutoff_freq
         policy_kwargs["noise_order"] = noise_order
-        policy_kwargs["dt"] = env.unwrapped.envs[0].dt
+        if hasattr(env.unwrapped.envs[0], "dt"):
+            policy_kwargs["dt"] = env.unwrapped.envs[0].dt
+        elif hasattr(env.unwrapped.envs[0].unwrapped, "point_env"):
+            policy_kwargs["dt"] = env.unwrapped.envs[0].unwrapped.point_env.dt
+        elif hasattr(env.unwrapped.envs[0].unwrapped, "ant_env"):
+            policy_kwargs["dt"] = env.unwrapped.envs[0].unwrapped.ant_env.dt
         policy_kwargs["noise_rng"] = np.random.default_rng(seed=seed)
     else:
         policy = "MlpPolicy"
