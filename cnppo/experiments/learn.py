@@ -16,6 +16,7 @@ from gymnasium.wrappers import FlattenObservation
 from cnppo.dm_control_wrapper import DMControlGymWrapper
 import gymnasium as gym
 import gymnasium_robotics
+import mujoco_maze
 
 from cnppo.lppolicy import LowPassNoiseActorCriticPolicy
 
