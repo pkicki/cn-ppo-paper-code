@@ -55,3 +55,7 @@ class DMControlGymWrapper(gym.Env):
     def render(self):
         return self._env.physics.render(camera_id=0)
 
+    @property
+    def dt(self):
+        return self._env.control_timestep()
+
