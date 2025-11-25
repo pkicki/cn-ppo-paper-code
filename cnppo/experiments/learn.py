@@ -17,6 +17,8 @@ from cnppo.dm_control_wrapper import DMControlGymWrapper
 import gymnasium as gym
 import gymnasium_robotics
 
+from cnppo.lppolicy import LowPassNoiseActorCriticPolicy
+
 gym.register_envs(gymnasium_robotics)
 
 # -----
@@ -58,8 +60,10 @@ def run_experiment(
     batch_size=64,
     n_epochs=10,
     noise_color=0.0,
+    noise_cutoff_freq=0.0,
+    noise_order=1,
     eval_episodes=50,
-    cn_policy=True,
+    policy="mlp",
     total_timesteps=1e7,
     eval_freq: int = 10_240,
     n_steps: int = 2048,
@@ -99,9 +103,15 @@ def run_experiment(
     tensorboard_log_path = f"runs/{run.id}"
 
     policy_kwargs = {}
-    if cn_policy:
+    if policy == "cn":
         policy = ColoredNoiseActorCriticPolicy
         policy_kwargs["noise_color_beta"] = noise_color
+        policy_kwargs["noise_rng"] = np.random.default_rng(seed=seed)
+    elif policy == "lp":
+        policy = LowPassNoiseActorCriticPolicy
+        policy_kwargs["noise_cutoff_freq"] = noise_cutoff_freq
+        policy_kwargs["noise_order"] = noise_order
+        policy_kwargs["dt"] = env.unwrapped.envs[0].dt
         policy_kwargs["noise_rng"] = np.random.default_rng(seed=seed)
     else:
         policy = "MlpPolicy"
@@ -143,10 +153,12 @@ if __name__ == "__main__":
     parser.add_argument("--clip-range", type=float, default=0.2)
     parser.add_argument("--eval-episodes", type=int, default=50)
     parser.add_argument("--eval-freq", type=int, default=10_240)
-    parser.add_argument("--no-cn-policy", action="store_true")
+    parser.add_argument("--policy", type=str, default="mlp")
     parser.add_argument("--use-sde", action="store_true")
     parser.add_argument("--total-timesteps", type=float, default=int(2_048_010))
     parser.add_argument("--noise-color", type=float, default=0.0)
+    parser.add_argument("--noise-order", type=int, default=1)
+    parser.add_argument("--noise-cutoff-freq", type=float, default=0.0)
     parser.add_argument("--n-steps", type=int, default=2048)  # 2048 is the stable-baselines default
     # ----------
     parser.add_argument("--version", type=float, default=VERSION)
@@ -176,8 +188,10 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
         eval_episodes=args.eval_episodes,
-        cn_policy=not args.no_cn_policy,
+        policy=args.policy,
         noise_color=args.noise_color,
+        noise_cutoff_freq=args.noise_cutoff_freq,
+        noise_order=args.noise_order,
         total_timesteps=int(args.total_timesteps),
         eval_freq=args.eval_freq,
         use_sde=args.use_sde,
